@@ -18,10 +18,10 @@ type State
 
 
 type alias Hands =
-    { self : List Card
-    , right : Int
-    , teammate : Int
-    , left : Int
+    { s : List Card
+    , w : Int
+    , n : Int
+    , e : Int
     }
 
 

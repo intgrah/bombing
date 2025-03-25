@@ -14,13 +14,9 @@ init pos =
     Tween pos pos
 
 
-set : Bool -> Vector -> Tween -> Tween
-set instantly pos tween =
-    if instantly then
-        init pos
-
-    else
-        { tween | target = pos }
+set : Vector -> Tween -> Tween
+set pos tween =
+    { tween | target = pos }
 
 
 tick : Tween -> Tween

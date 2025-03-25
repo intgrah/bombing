@@ -2,10 +2,7 @@ open Base
 open Types
 open Ppx_yojson_conv_lib.Yojson_conv
 
-type hand = Card.t list [@@deriving show, of_yojson]
-
-let yojson_of_hand (hand : hand) =
-  List.map hand ~f:Card.to_string_compact |> String.concat |> yojson_of_string
+type hand = Card.t list [@@deriving show, yojson]
 
 type t =
   | Playing of {

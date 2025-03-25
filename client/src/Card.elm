@@ -1,4 +1,4 @@
-module Card exposing (Card(..), Joker(..), Rank(..), Suit(..), compare, decode, decodeCompact, decodeRank, encode, faceDown, faceUp, height, spacing, width)
+module Card exposing (Card(..), Joker(..), Rank(..), Suit(..), compare, decode, decodeRank, encode, faceDown, faceUp, spacing)
 
 import Json.Decode as D
 import Json.Encode as E
@@ -74,112 +74,109 @@ compare c1 c2 =
 ---- View ----
 
 
-faceUp : (Float -> Float) -> Card -> List (Svg.Attribute msg) -> Svg msg
-faceUp scale card attributes =
-    Svg.g attributes
+faceUp : Float -> Card -> Svg msg
+faceUp size card =
+    let
+        width =
+            0.75 * size
+
+        height =
+            size
+    in
+    Svg.g []
         [ Svg.rect
             [ SvgA.fill "#f7f7f7"
-            , SvgA.width (String.fromFloat <| scale width)
-            , SvgA.height (String.fromFloat <| scale height)
-            , SvgA.rx (String.fromFloat <| 0.0625 * scale height)
+            , SvgA.width (String.fromFloat <| width)
+            , SvgA.height (String.fromFloat <| height)
+            , SvgA.rx (String.fromFloat <| 0.0625 * height)
             , SvgA.cursor "pointer"
             , SvgA.filter "url(#cardShadow)"
             ]
             []
-            |> Transform.translate { x = scale width / -2, y = scale height / -2 }
+            |> Transform.translate { x = width / -2, y = height / -2 }
         , let
             pips =
                 case card of
                     R rank suit ->
                         Svg.g []
                             [ Svg.text_
-                                [ SvgA.x (String.fromFloat <| 0.12 * scale width)
-                                , SvgA.y (String.fromFloat <| 0.15 * scale height)
-                                , SvgA.fontSize (String.fromFloat <| 0.13 * scale height)
+                                [ SvgA.x (String.fromFloat <| 0.12 * width)
+                                , SvgA.y (String.fromFloat <| 0.15 * height)
+                                , SvgA.fontSize (String.fromFloat <| 0.13 * height)
                                 ]
                                 [ Svg.text (rankToString rank) ]
                             , Svg.text_
-                                [ SvgA.x (String.fromFloat <| 0.12 * scale width)
-                                , SvgA.y (String.fromFloat <| 0.275 * scale height)
-                                , SvgA.fontSize (String.fromFloat <| 0.13 * scale height)
+                                [ SvgA.x (String.fromFloat <| 0.12 * width)
+                                , SvgA.y (String.fromFloat <| 0.275 * height)
+                                , SvgA.fontSize (String.fromFloat <| 0.13 * height)
                                 ]
                                 [ Svg.text (suitToString suit) ]
                             ]
 
                     J _ ->
                         Svg.text_
-                            [ SvgA.x (String.fromFloat <| 0.1 * scale height)
-                            , SvgA.y (String.fromFloat <| 0.15 * scale height)
-                            , SvgA.fontSize (String.fromFloat <| 0.13 * scale height)
+                            [ SvgA.x (String.fromFloat <| 0.1 * height)
+                            , SvgA.y (String.fromFloat <| 0.15 * height)
+                            , SvgA.fontSize (String.fromFloat <| 0.13 * height)
                             ]
                             [ Svg.text "❂" ]
           in
           Svg.g
             [ SvgA.fontFamily "sans"
-            , SvgA.fontSize (String.fromFloat <| scale 0.02)
+            , SvgA.fontSize (String.fromFloat <| 0.2 * height)
             , SvgA.fontStyle "bold"
             , SvgA.fill (colourOf card)
             , SvgA.textAnchor "middle"
             , SvgA.style "user-select: none"
             , SvgA.cursor "pointer"
             ]
-            [ pips |> Transform.translate { x = scale width / -2, y = scale height / -2 }
-            , pips |> Transform.translate { x = scale width / -2, y = scale height / -2 } |> Transform.rotate 180
+            [ pips |> Transform.translate { x = width / -2, y = height / -2 }
+            , pips |> Transform.translate { x = width / -2, y = height / -2 } |> Transform.rotate (turns 0.5)
             ]
         ]
 
 
-faceDown : (Float -> Float) -> List (Svg.Attribute msg) -> Svg msg
-faceDown scale attributes =
-    Svg.g attributes
+faceDown : Float -> Svg msg
+faceDown size =
+    let
+        width =
+            0.75 * size
+
+        height =
+            size
+    in
+    Svg.g []
         [ Svg.rect
             [ SvgA.fill "#3d5c8a"
-            , SvgA.width (String.fromFloat <| scale width)
-            , SvgA.height (String.fromFloat <| scale height)
-            , SvgA.rx (String.fromFloat <| 0.0625 * scale height)
+            , SvgA.width (String.fromFloat <| width)
+            , SvgA.height (String.fromFloat <| height)
+            , SvgA.rx (String.fromFloat <| 0.0625 * height)
             , SvgA.cursor "pointer"
             , SvgA.filter "url(#cardShadow)"
             ]
             []
         , Svg.image
             [ SvgA.xlinkHref "/optiver-logo.svg"
-            , SvgA.width (String.fromFloat <| 0.5 * scale width)
-            , SvgA.x (String.fromFloat <| 0.25 * scale width)
-            , SvgA.y (String.fromFloat <| 0.3 * scale height)
+            , SvgA.width (String.fromFloat <| 0.5 * width)
+            , SvgA.height (String.fromFloat <| 0.2 * width)
+            , SvgA.x (String.fromFloat <| 0.25 * width)
+            , SvgA.y (String.fromFloat <| 0.3 * height)
             ]
             []
         , Svg.image
             [ SvgA.xlinkHref "/optiver-circle.png"
-            , SvgA.width (String.fromFloat <| 0.4 * scale width)
-            , SvgA.x (String.fromFloat <| 0.3 * scale width)
-            , SvgA.y (String.fromFloat <| 0.5 * scale height)
+            , SvgA.width (String.fromFloat <| 0.4 * width)
+            , SvgA.x (String.fromFloat <| 0.3 * width)
+            , SvgA.y (String.fromFloat <| 0.5 * height)
             ]
             []
         ]
-        |> Transform.translate { x = scale width / -2, y = scale height / -2 }
-
-
-
-{-
-   How tall is a card? How wide is it? The normal ratio is 4:3.
-   Note that these numbers also depends on the window size.
-   Scale them by the window height!
--}
-
-
-height : Float
-height =
-    0.1
-
-
-width : Float
-width =
-    0.75 * height
+        |> Transform.translate { x = width / -2, y = height / -2 }
 
 
 spacing : Float
 spacing =
-    0.18 * height
+    0.18 * 0.1
 
 
 
@@ -506,165 +503,3 @@ decodeJoker =
                         D.fail "Not a valid Joker type!"
             )
             D.string
-
-
-
----- Compact JSON encoders ----
-{-
-   Since the JSON representation can be verbose,
-   here are more compact representations.
--}
-
-
-encodeCompact : Card -> E.Value
-encodeCompact card =
-    case card of
-        R r s ->
-            E.string (String.fromList [ encodeRankCompact r, encodeSuitCompact s ])
-
-        J Black ->
-            E.string "xx"
-
-        J Red ->
-            E.string "XX"
-
-
-encodeRankCompact : Rank -> Char
-encodeRankCompact rank =
-    case rank of
-        Two ->
-            '2'
-
-        Three ->
-            '3'
-
-        Four ->
-            '4'
-
-        Five ->
-            '5'
-
-        Six ->
-            '6'
-
-        Seven ->
-            '7'
-
-        Eight ->
-            '8'
-
-        Nine ->
-            '9'
-
-        Ten ->
-            'T'
-
-        Jack ->
-            'J'
-
-        Queen ->
-            'Q'
-
-        King ->
-            'K'
-
-        Ace ->
-            'A'
-
-
-encodeSuitCompact : Suit -> Char
-encodeSuitCompact suit =
-    case suit of
-        Diamonds ->
-            'd'
-
-        Clubs ->
-            'c'
-
-        Hearts ->
-            'h'
-
-        Spades ->
-            's'
-
-
-
----- JSON decoders ----
-
-
-decodeCompact : ( Char, Char ) -> Maybe Card
-decodeCompact ( a, b ) =
-    case ( a, b ) of
-        ( 'x', 'x' ) ->
-            Just (J Black)
-
-        ( 'X', 'X' ) ->
-            Just (J Red)
-
-        ( r, s ) ->
-            Maybe.map2 R (decodeRankCompact r) (decodeSuitCompact s)
-
-
-decodeRankCompact : Char -> Maybe Rank
-decodeRankCompact char =
-    case char of
-        '2' ->
-            Just Two
-
-        '3' ->
-            Just Three
-
-        '4' ->
-            Just Four
-
-        '5' ->
-            Just Five
-
-        '6' ->
-            Just Six
-
-        '7' ->
-            Just Seven
-
-        '8' ->
-            Just Eight
-
-        '9' ->
-            Just Nine
-
-        'T' ->
-            Just Ten
-
-        'J' ->
-            Just Jack
-
-        'Q' ->
-            Just Queen
-
-        'K' ->
-            Just King
-
-        'A' ->
-            Just Ace
-
-        _ ->
-            Nothing
-
-
-decodeSuitCompact : Char -> Maybe Suit
-decodeSuitCompact char =
-    case char of
-        'd' ->
-            Just Diamonds
-
-        'c' ->
-            Just Clubs
-
-        'h' ->
-            Just Hearts
-
-        's' ->
-            Just Spades
-
-        _ ->
-            Nothing

@@ -11,7 +11,6 @@ import Json.Decode
 import Pages.Playing as Playing
 import Time
 import Tween
-import Vector exposing (Vector)
 import WebSocket as Ws
 
 
@@ -47,11 +46,30 @@ type Page
 
 init : () -> ( Model, Cmd Msg )
 init () =
-    -- PlayingModel (Playing.init 0 0)
-    ( { width = 0, height = 0, page = LoadingModel }, Cmd.none )
+    ( { width = 0
+      , height = 0
+      , page =
+            PlayingModel <|
+                Playing.init
+                    { access_token = "token"
+                    , user =
+                        { username = "user"
+                        , discriminator = "0"
+                        , id = ""
+                        , avatar = Nothing
+                        , global_name = Nothing
+                        }
+                    , expires = ""
+                    }
+                    0
+                    0
+      }
+    , Cmd.none
+    )
 
 
 
+-- ( { width = 0, height = 0, page = LoadingModel }, Cmd.none )
 ---- Update ----
 
 
@@ -124,58 +142,54 @@ update message model =
                         { auth = m.auth
                         , width = model.width
                         , height = model.height
-                        , handSelf =
-                            (case g.state of
-                                Game.Playing { hands } ->
-                                    hands.self
-
-                                Game.Trading { hands } ->
-                                    hands.self
-                            )
-                                |> List.map (\c -> { pos = Tween.init { x = 0, y = 0 }, card = c, z = 0 })
-
-                        --- List (CardData Card)
-                        , handTeammate =
-                            List.repeat
+                        , hands =
+                            { s =
                                 (case g.state of
                                     Game.Playing { hands } ->
-                                        hands.teammate
+                                        hands.s
 
                                     Game.Trading { hands } ->
-                                        hands.teammate
+                                        hands.s
                                 )
-                                Nothing
-                                |> List.map (\c -> { pos = Tween.init { x = 0, y = 0 }, card = c, z = 0 })
+                                    |> List.map (\c -> { pos = Tween.init { x = 0, y = 0 }, card = c, z = 0 })
+                            , n =
+                                List.repeat
+                                    (case g.state of
+                                        Game.Playing { hands } ->
+                                            hands.n
 
-                        ---List (CardData (Maybe Card))
-                        , handLeftPlayer =
-                            List.repeat
-                                (case g.state of
-                                    Game.Playing { hands } ->
-                                        hands.left
+                                        Game.Trading { hands } ->
+                                            hands.n
+                                    )
+                                    Nothing
+                                    |> List.map (\c -> { pos = Tween.init { x = 0, y = 0 }, card = c, z = 0 })
+                            , w =
+                                List.repeat
+                                    (case g.state of
+                                        Game.Playing { hands } ->
+                                            hands.w
 
-                                    Game.Trading { hands } ->
-                                        hands.left
-                                )
-                                ()
-                                |> List.map (\c -> { pos = Tween.init { x = 0, y = 0 }, card = c, z = 0 })
+                                        Game.Trading { hands } ->
+                                            hands.w
+                                    )
+                                    ()
+                                    |> List.map (\c -> { pos = Tween.init { x = 0, y = 0 }, card = c, z = 0 })
+                            , e =
+                                List.repeat
+                                    (case g.state of
+                                        Game.Playing { hands } ->
+                                            hands.e
 
-                        ---List (CardData ())
-                        , handRightPlayer =
-                            List.repeat
-                                (case g.state of
-                                    Game.Playing { hands } ->
-                                        hands.right
-
-                                    Game.Trading { hands } ->
-                                        hands.right
-                                )
-                                ()
-                                |> List.map (\c -> { pos = Tween.init { x = 0, y = 0 }, card = c, z = 0 })
-                        , table = [] --- List (CardData Card)
-                        , selected = [] --- List (CardData Card)
-                        , mouse = Vector 0 0 ---Vector
-                        , selectionPos = Vector 0 0 ---Vector
+                                        Game.Trading { hands } ->
+                                            hands.e
+                                    )
+                                    ()
+                                    |> List.map (\c -> { pos = Tween.init { x = 0, y = 0 }, card = c, z = 0 })
+                            }
+                        , table = []
+                        , selected = []
+                        , mouse = { x = 0, y = 0 }
+                        , selectionPos = { x = 0, y = 0 }
                         }
               }
             , Cmd.none

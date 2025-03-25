@@ -13,7 +13,8 @@ let () =
   @@ Player.Store ([ "e" ], [ ""; "" ], [ "" ], [ ""; "" ]) *)
 
 let () =
-  Stdio.print_endline @@ Yojson.Safe.to_string @@ Types.Rank.yojson_of_t Types.Rank.Two
+  Stdio.print_endline @@ Yojson.Safe.to_string
+  @@ Types.Rank.yojson_of_t Types.Rank.Two
 
 let state : Model.t ref = ref Model.init
 
@@ -131,6 +132,7 @@ let update ~(socket : Dream.websocket) ~(user : Discord.user)
 
 let main () =
   let ws_server (req : Dream.request) (socket : Dream.websocket) : Cmd.t =
+    Dream.log "Foo";
     match Dream.query req "token" with
     | None -> Dream.close_websocket socket
     | Some access_token -> (

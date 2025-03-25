@@ -1,6 +1,6 @@
-port module WebSocket exposing (Receive(..), Send(..), decodeListCardCompact, decode, encode, receive, send)
+port module WebSocket exposing (Receive(..), Send(..), decode, encode, receive, send)
 
-import Card exposing (Card)
+import Card
 import Game
 import Json.Decode as D
 import Json.Encode as E
@@ -214,47 +214,14 @@ decodeGameState =
                         Debug.log variant D.fail "Unknown game state variant"
             )
 
+
 decodeHands : D.Decoder Game.Hands
 decodeHands =
     D.map4 Game.Hands
-        (D.field "s" decodeListCardCompact)
+        (D.field "s" <| D.list Card.decode)
         (D.field "e" D.int)
         (D.field "n" D.int)
         (D.field "w" D.int)
-
-
-chunkTwo : List a -> List ( a, a )
-chunkTwo list =
-    case list of
-        [] ->
-            []
-
-        [ _ ] ->
-            []
-
-        x :: y :: t ->
-            ( x, y ) :: chunkTwo t
-
-
-decodeListCardCompact : D.Decoder (List Card)
-decodeListCardCompact =
-    D.andThen
-        (\str ->
-            str
-                |> String.toList
-                |> chunkTwo
-                |> List.map Card.decodeCompact
-                |> List.foldl (\s -> Maybe.map2 (::) s) (Just [])
-                |> (\xx ->
-                        case xx of
-                            Nothing ->
-                                D.fail ""
-
-                            Just ls ->
-                                D.succeed ls
-                   )
-        )
-        D.string
 
 
 decodeStore : D.Decoder a -> D.Decoder (Game.Store a)

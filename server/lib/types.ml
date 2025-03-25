@@ -115,7 +115,8 @@ end
 module Card = struct
   open Base
 
-  type t = R of Rank.t * Suit.t | J of Joker.t [@@deriving show, eq, ord, yojson]
+  type t = R of Rank.t * Suit.t | J of Joker.t
+  [@@deriving show, eq, ord, yojson]
 
   let to_string : t -> string = function
     | R (r, s) -> Rank.to_string r ^ Suit.to_string s
@@ -136,44 +137,6 @@ module Card = struct
         match Rank.compare_at level r0 r1 with
         | 0 -> Suit.compare s0 s1
         | n -> n)
-
-  let to_string_compact : t -> string = function
-    | R (r, s) -> Rank.to_string r ^ Suit.to_string_serial s
-    | J Black -> "xx"
-    | J Red -> "XX"
-
-  let of_string_compact (str : string) : t =
-    match String.to_list str with
-    | [ 'X'; 'X' ] -> J Red
-    | [ 'x'; 'x' ] -> J Red
-    | [ r; s ] ->
-        let rank : Rank.t =
-          match r with
-          | '2' -> Two
-          | '3' -> Three
-          | '4' -> Four
-          | '5' -> Five
-          | '6' -> Six
-          | '7' -> Seven
-          | '8' -> Eight
-          | '9' -> Nine
-          | 'T' -> Ten
-          | 'J' -> Jack
-          | 'Q' -> Queen
-          | 'K' -> King
-          | 'A' -> Ace
-          | _ -> raise (Yojson.Json_error "Not a card: not a rank")
-        in
-        let suit : Suit.t =
-          match s with
-          | 'd' -> Diamonds
-          | 'c' -> Clubs
-          | 'h' -> Hearts
-          | 's' -> Spades
-          | _ -> raise (Yojson.Json_error "Not a card: not a suit")
-        in
-        R (rank, suit)
-    | _ -> raise (Yojson.Json_error "Not a card: wrong number of characters")
 end
 
 module Rankj = struct
