@@ -1,25 +1,25 @@
-module Tween exposing (..)
+module Animated exposing (..)
 
 import Vector exposing (Vector)
 
 
-type alias Tween =
+type alias Animated =
     { current : Vector
     , target : Vector
     }
 
 
-init : Vector -> Tween
+init : Vector -> Animated
 init pos =
-    Tween pos pos
+    Animated pos pos
 
 
-set : Vector -> Tween -> Tween
-set pos tween =
-    { tween | target = pos }
+set : Vector -> Animated -> Animated
+set pos anim =
+    { anim | target = pos }
 
 
-tick : Tween -> Tween
+tick : Animated -> Animated
 tick { current, target } =
     let
         difference =
