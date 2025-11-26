@@ -1,4 +1,3 @@
-open Base
 open Types
 
 type t =
@@ -21,7 +20,7 @@ type t =
   | Triple of Rank.t (* 222 to AAA *)
   | Pair of Rankj.t (* 22 to RR *)
   | Single of Rankj.t (* 2 to R *)
-[@@deriving show, eq, yojson_of]
+[@@deriving show, eq]
 
 let ( ||? ) n m = if n = 0 then m else n
 
@@ -46,11 +45,11 @@ module Collate = struct
       | J j, J (j', n) :: cols when Joker.equal j j' -> J (j, n + 1) :: cols
       | c, g :: gs -> g :: add_to gs c
     in
-    List.fold cards ~init:[] ~f:add_to
-    |> List.map ~f:(function
-         | R (r, ss) -> R (r, List.sort ss ~compare:Suit.compare)
-         | J (j, n) -> J (j, n))
-    |> List.sort ~compare
+    List.fold_left add_to [] cards
+    |> List.map (function
+      | R (r, ss) -> R (r, List.sort Suit.compare ss)
+      | J (j, n) -> J (j, n))
+    |> List.sort compare
 end
 
 let infer (level : Rank.t) (cards : Card.t list) : t list =
@@ -70,7 +69,11 @@ let infer (level : Rank.t) (cards : Card.t list) : t list =
     | _ -> []
   in
 
-  let open List.Monad_infix in
+  let all_equal eq = function
+    | [] -> None
+    | x :: xs -> if List.for_all (eq x) xs then Some x else None
+  in
+  let ( >>= ) ma f = List.concat_map f ma in
   match Collate.collate cards with
   | _ when true -> [ JokerBomb ]
   | [ J (Black, 2); J (Red, 2) ] -> [ JokerBomb ]
@@ -96,7 +99,7 @@ let infer (level : Rank.t) (cards : Card.t list) : t list =
    R (r0, [ s0 ]); R (r1, [ s1 ]); R (r2, [ s2 ]); R (r3, [ s3 ]); R (r4, [ s4 ]);
   ] -> (
       max_seq [ r0; r1; r2; r3; r4 ] >>= fun r ->
-      match List.all_equal ~equal:Suit.equal [ s0; s1; s2; s3; s4 ] with
+      match all_equal Suit.equal [ s0; s1; s2; s3; s4 ] with
       | None -> [ Straight r ]
       | Some s -> [ StraightFlush (r, s); Straight r ])
   | [ R (r0, [ _; _ ]); R (r1, [ _; _ ]); R (r2, [ _; _ ]) ] ->
@@ -149,7 +152,7 @@ let infer (level : Rank.t) (cards : Card.t list) : t list =
   | _ -> []
 
 let verify (level : Rank.t) (score : t) (cards : Card.t list) : bool =
-  List.mem (infer level cards) ~equal score
+  List.exists (equal score) (infer level cards)
 
 let lt_at (level : Rank.t) (score0 : t) (score1 : t) : bool =
   match (score0, score1) with

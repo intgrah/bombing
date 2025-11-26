@@ -1,7 +1,5 @@
-open Base
-
 module Joker = struct
-  type t = Black | Red [@@deriving show, eq, ord, yojson]
+  type t = Black | Red [@@deriving show, eq, ord]
 end
 
 module Rank = struct
@@ -19,7 +17,7 @@ module Rank = struct
     | Queen
     | King
     | Ace
-  [@@deriving show, eq, ord, yojson]
+  [@@deriving show, eq, ord]
 
   let to_string : t -> string = function
     | Two -> "2"
@@ -94,8 +92,7 @@ module Rank = struct
 end
 
 module Suit = struct
-  type t = Diamonds | Clubs | Hearts | Spades
-  [@@deriving show, eq, ord, yojson]
+  type t = Diamonds | Clubs | Hearts | Spades [@@deriving show, eq, ord]
 
   let to_string : t -> string = function
     | Diamonds -> "♢"
@@ -113,10 +110,7 @@ module Suit = struct
 end
 
 module Card = struct
-  open Base
-
-  type t = R of Rank.t * Suit.t | J of Joker.t
-  [@@deriving show, eq, ord, yojson]
+  type t = R of Rank.t * Suit.t | J of Joker.t [@@deriving show, eq, ord]
 
   let to_string : t -> string = function
     | R (r, s) -> Rank.to_string r ^ Suit.to_string s
@@ -125,8 +119,7 @@ module Card = struct
 
   let all : t list =
     J Red :: J Black
-    :: List.map (List.cartesian_product Rank.all Suit.all) ~f:(fun (r, s) ->
-           R (r, s))
+    :: List.concat_map (fun s -> List.map (fun r -> R (r, s)) Rank.all) Suit.all
 
   let compare_at (level : Rank.t) (c0 : t) (c1 : t) : int =
     match (c0, c1) with
@@ -140,7 +133,7 @@ module Card = struct
 end
 
 module Rankj = struct
-  type t = R of Rank.t | J of Joker.t [@@deriving show, eq, ord, yojson_of]
+  type t = R of Rank.t | J of Joker.t [@@deriving show, eq, ord]
 
   let of_card : Card.t -> t = function R (r, _) -> R r | J j -> J j
 

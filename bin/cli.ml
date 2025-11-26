@@ -1,6 +1,4 @@
-open Base
 open Guandan
-open Stdio
 open Types
 
 let to_string : Game.server_t -> string =
@@ -11,7 +9,7 @@ let to_string : Game.server_t -> string =
     | Big_slave -> "  Big slave "
   in
   let cts (cards : Card.t list) =
-    String.concat ~sep:" " (List.map cards ~f:Card.to_string)
+    String.concat " " (List.map Card.to_string cards)
   in
   let lts : Game.level -> string = function
     | { ac = r; bd = _; who = AC } ->
@@ -53,13 +51,13 @@ let to_string : Game.server_t -> string =
 let game = ref (Game.new_game ())
 
 let rec main () =
-  let open Result.Let_syntax in
+  let ( let* ) = Result.bind in
   let parse_message (msg : string) =
     let parse_card (str : string) : Types.Card.t option =
-      match String.to_list str with
+      match List.of_seq (String.to_seq str) with
       | [ 'b'; 'j' ] -> Some (J Red)
       | [ 's'; 'j' ] -> Some (J Black)
-      | [ r; s ] ->
+      | [ r; s ] -> (
           let rank : Types.Rank.t option =
             match r with
             | '2' -> Some Two
@@ -85,16 +83,20 @@ let rec main () =
             | 'h' | 'H' -> Some Hearts
             | _ -> None
           in
-          Option.map2 rank suit ~f:(fun r s -> Types.Card.R (r, s))
+          match (rank, suit) with
+          | Some r, Some s -> Some (Types.Card.R (r, s))
+          | _ -> None)
       | _ -> None
     in
     let rec parse_cards = function
       | [] -> Some []
-      | cs :: rest ->
-          Option.map2 (parse_card cs) (parse_cards rest) ~f:List.cons
+      | cs :: rest -> (
+          match (parse_card cs, parse_cards rest) with
+          | Some c, Some tl -> Some (c :: tl)
+          | _ -> None)
     in
-    let string_split = String.split msg ~on:' ' in
-    let%bind player, rest =
+    let string_split = String.split_on_char ' ' msg in
+    let* player, rest =
       match string_split with
       | "a" :: rest -> Ok (Player.A, rest)
       | "b" :: rest -> Ok (Player.B, rest)
@@ -102,17 +104,17 @@ let rec main () =
       | "d" :: rest -> Ok (Player.D, rest)
       | _ -> Error `Invalid_player
     in
-    let%bind msg =
+    let* msg =
       match rest with
       | [ "pass" ] -> Ok Game.Pass
       | "play" :: cards -> (
           match parse_cards cards with
           | None -> Error `Couldn't_parse_cards
-          | Some cs -> Ok (Game.Play cs))
+          | Some cards -> Ok (Game.Play cards))
       | [ "trade"; card ] -> (
           match parse_card card with
           | None -> Error `Couldn't_parse_cards
-          | Some cs -> Ok (Game.Trade cs))
+          | Some card -> Ok (Game.Trade card))
       | [ "revolt" ] -> Error `Not_implemented
       | _ -> Error `Invalid_command
     in
@@ -121,31 +123,32 @@ let rec main () =
 
   print_endline (to_string !game);
   print_string ">>> ";
-  Out_channel.flush Out_channel.stdout;
-  match In_channel.input_line In_channel.stdin with
-  | Some "q" | Some "quit" -> print_endline "Bye"
-  | Some input ->
+  flush stdout;
+  match read_line () with
+  | exception End_of_file -> ()
+  | "q" | "quit" -> print_endline "Bye"
+  | input ->
       (match parse_message input with
       | Ok (player, message) -> (
           match Game.transition !game player message with
           | Ok (game', _) -> game := game'
-          | Error `Already_traded -> Stdio.prerr_endline "Already traded"
-          | Error `Cannot_pass -> Stdio.prerr_endline "Cannot pass"
-          | Error `Doesn't_beat -> Stdio.prerr_endline "Doesn't beat"
+          | Error `Already_traded -> prerr_endline "Already traded"
+          | Error `Cannot_pass -> prerr_endline "Cannot pass"
+          | Error `Doesn't_beat -> prerr_endline "Doesn't beat"
           | Error `Incorrent_number_of_cards ->
-              Stdio.prerr_endline "Incorrect number of cards"
+              prerr_endline "Incorrect number of cards"
           | Error `Must_give_highest_cards ->
-              Stdio.prerr_endline "Must give highest cards"
-          | Error `Not_enough_cards -> Stdio.prerr_endline "Not enough cards"
-          | Error `Not_implemented -> Stdio.prerr_endline "Not implemented"
-          | Error `Not_your_turn -> Stdio.prerr_endline "Not your turn"
-          | Error `Wrong_phase -> Stdio.prerr_endline "Wrong phase"
-          | Error `Wrong_score -> Stdio.prerr_endline "Wrong score"
-          | Error _ -> Stdio.prerr_endline "Internal Error")
-      | Error `Invalid_command -> Stdio.prerr_endline "Invalid command"
-      | Error `Invalid_player -> Stdio.prerr_endline "Invalid player"
-      | Error `Couldn't_parse_cards ->
-          Stdio.prerr_endline "Couldn't parse cards"
-      | Error `Not_implemented -> Stdio.prerr_endline "Not implemented");
+              prerr_endline "Must give highest cards"
+          | Error `Not_enough_cards -> prerr_endline "Not enough cards"
+          | Error `Not_implemented -> prerr_endline "Not implemented"
+          | Error `Not_your_turn -> prerr_endline "Not your turn"
+          | Error `Wrong_phase -> prerr_endline "Wrong phase"
+          | Error `Wrong_score -> prerr_endline "Wrong score"
+          | Error _ -> prerr_endline "Internal Error")
+      | Error `Invalid_command -> prerr_endline "Invalid command"
+      | Error `Invalid_player -> prerr_endline "Invalid player"
+      | Error `Couldn't_parse_cards -> prerr_endline "Couldn't parse cards"
+      | Error `Not_implemented -> prerr_endline "Not implemented");
       main ()
-  | None -> ()
+
+let () = main ()

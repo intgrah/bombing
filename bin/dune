@@ -1,6 +1,4 @@
 (executable
  (public_name guandan)
- (name main)
- (libraries guandan base stdio dream cohttp cohttp-lwt-unix)
- (preprocess
-  (pps lwt_ppx ppx_let ppx_yojson_conv)))
+ (name cli)
+ (libraries guandan))

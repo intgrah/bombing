@@ -1,4 +1,4 @@
-(lang dune 3.17)
+(lang dune 3.20)
 
 (name guandan)
 
@@ -7,13 +7,9 @@
 (source
  (github IntGrah/guandan))
 
-(authors "Author Name <author@example.com>")
-
-(maintainers "Maintainer Name <maintainer@example.com>")
+(authors "Jeremy Chen <git@sl.intgrah.com>")
 
 (license LICENSE)
-
-(documentation https://url/to/documentation)
 
 (package
  (name guandan)
