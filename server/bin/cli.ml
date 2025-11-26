@@ -3,7 +3,7 @@ open Guandan
 open Stdio
 open Types
 
-let to_string : Game.t -> string =
+let to_string : Game.server_t -> string =
   let pts : Player.position -> string = function
     | Big_master -> "  Big master"
     | Small_master -> "Small master"
@@ -14,8 +14,10 @@ let to_string : Game.t -> string =
     String.concat ~sep:" " (List.map cards ~f:Card.to_string)
   in
   let lts : Game.level -> string = function
-    | Game.Level (r, _, AC) -> Printf.sprintf "%s (AC)" (Rank.to_string r)
-    | Game.Level (_, r, BD) -> Printf.sprintf "%s (BD)" (Rank.to_string r)
+    | { ac = r; bd = _; who = AC } ->
+        Printf.sprintf "%s (AC)" (Rank.to_string r)
+    | { ac = _; bd = r; who = BD } ->
+        Printf.sprintf "%s (BD)" (Rank.to_string r)
   in
   let curts : (Player.t * Score.t) option -> string = function
     | None -> "leads"
@@ -23,15 +25,15 @@ let to_string : Game.t -> string =
         Printf.sprintf "to beat %s's %s" (Player.show owner) (Score.show score)
   in
   function
-  | Winner (team, level) ->
+  | Winner { team; level } ->
       Printf.sprintf "Winner: %s %s" (Player.show_team team)
         (Game.show_level level)
-  | Playing (Store (a, b, c, d), level, _, turn, current) ->
+  | Playing { hands = { a; b; c; d }; level; finished = _; turn; current } ->
       Printf.sprintf
         "[Playing] Level: %s\nA | %s\nB |  %s\nC |  %s\nD |  %s\n%s %s"
         (lts level) (cts a) (cts b) (cts c) (cts d) (Player.show turn)
         (curts current)
-  | Trading (Store (a, b, c, d), level, position, remaining) ->
+  | Trading { hands = { a; b; c; d }; level; position; remaining } ->
       Printf.sprintf
         "[Trading] Level: %s\n\
          A | %s | %d |  %s\n\

@@ -32,16 +32,17 @@ let projection
              : Client.username_and_avatar))
   in
   function
-  | Store (a, b, c, d) -> Store (project a, project b, project c, project d)
+  | { a; b; c; d } ->
+      { a = project a; b = project b; c = project c; d = project d }
 
 let update ~(socket : Dream.websocket) ~(user : Discord.user)
-    (msg : Client.receive) (model : Model.t) : Model.t * Cmd.t =
+    (msg : Client.receive) (model : Model.t) : Model.t * unit Lwt.t =
   match msg with
   | Create_lobby_request ->
       let pin : string = Random.int 1000000 |> Int.to_string in
       let clients' = Map.singleton (module String) user.id (socket, user) in
       let players' : string list Player.store =
-        Player.Store ([ user.id ], [ user.id ], [ user.id ], [ user.id ])
+        { a = [ user.id ]; b = [ user.id ]; c = [ user.id ]; d = [ user.id ] }
       in
       let game' : Model.game =
         Model.Lobby { clients = clients'; players = players' }
@@ -67,28 +68,26 @@ let update ~(socket : Dream.websocket) ~(user : Discord.user)
           | `Ok clients' ->
               let players' : string list Player.store =
                 match lobby.players with
-                | Store ([], b, c, d) -> Store ([ user.id ], b, c, d)
-                | Store (a, [], c, d) -> Store (a, [ user.id ], c, d)
-                | Store (a, b, [], d) -> Store (a, b, [ user.id ], d)
-                | Store (a, b, c, []) -> Store (a, b, c, [ user.id ])
-                | Store (a, b, c, d) -> Store (user.id :: a, b, c, d)
+                | { a = []; b; c; d } -> { a = [ user.id ]; b; c; d }
+                | { a; b = []; c; d } -> { a; b = [ user.id ]; c; d }
+                | { a; b; c = []; d } -> { a; b; c = [ user.id ]; d }
+                | { a; b; c; d = [] } -> { a; b; c; d = [ user.id ] }
+                | { a; b; c; d } -> { a = user.id :: a; b; c; d }
               in
               let game' : Model.game =
                 Lobby { clients = clients'; players = players' }
               in
               let model' = Map.set model ~key:pin ~data:game' in
               let usernames_and_avatars = projection clients' players' in
+              let lobby_data : Client.lobby_data =
+                { pin; players = usernames_and_avatars }
+              in
               ( model',
-                Cmd.batch
-                  [
-                    Client.send
-                      (Join_lobby_success
-                         { pin; players = usernames_and_avatars })
-                      socket;
-                    Client.broadcast
-                      (Lobby_update { pin; players = usernames_and_avatars })
-                      (Map.data lobby.clients |> List.map ~f:fst);
-                  ] )))
+                let%lwt () =
+                  Client.send (Join_lobby_success lobby_data) socket
+                in
+                lobby.clients |> Map.data |> List.map ~f:fst
+                |> Lwt_list.iter_p (Client.send (Lobby_update lobby_data)) )))
   | Start_game_request { pin } -> (
       match Map.find model pin with
       | None -> (model, Client.send (Start_game_fail `No_such_lobby) socket)
@@ -96,8 +95,8 @@ let update ~(socket : Dream.websocket) ~(user : Discord.user)
           (model, Client.send (Start_game_fail `In_progress) socket)
       | Some (Lobby lobby) -> (
           match lobby.players with
-          | Store (_ :: _, _ :: _, _ :: _, _ :: _) ->
-              let game_state' : Game.t = Game.new_game () in
+          | { a = _ :: _; b = _ :: _; c = _ :: _; d = _ :: _ } ->
+              let game_state' : Game.server_t = Game.new_game () in
               let game' : Model.game =
                 Game
                   {
@@ -108,7 +107,7 @@ let update ~(socket : Dream.websocket) ~(user : Discord.user)
               in
               let model' = Map.set model ~key:pin ~data:game' in
               ( model',
-                Cmd.batch
+                Lwt_list.iter_p Fn.id
                   (* (Start_game_success { pin; client_id; state = game_state' }) *)
                   (Player.mapi lobby.players ~f:(fun p ids ->
                        List.map ids ~f:(fun id ->
@@ -128,38 +127,36 @@ let update ~(socket : Dream.websocket) ~(user : Discord.user)
               ( model,
                 Client.send (Start_game_fail `Positions_not_fulfilled) socket ))
       )
-  | _ -> (model, Cmd.none)
+  | _ -> (model, Lwt.return_unit)
 
 let main () =
-  let ws_server (req : Dream.request) (socket : Dream.websocket) : Cmd.t =
-    Dream.log "Foo";
-    match Dream.query req "token" with
+  let ws_server (_ : Dream.request) (socket : Dream.websocket) : unit Lwt.t =
+    (* match Dream.query req "token" with
     | None -> Dream.close_websocket socket
     | Some access_token -> (
         match%lwt Discord.get_user access_token with
         | None -> Dream.close_websocket socket
         | Some user ->
-            Dream.log "New client: %s\n" user.username;
-
-            let rec loop () =
-              match%lwt Dream.receive socket with
-              | None -> Dream.close_websocket socket
-              | Some msg_str -> (
-                  try
-                    let json = Yojson.Safe.from_string msg_str in
-                    let _user_id, msg =
-                      Client.receive_with_user_id_of_yojson json
-                    in
-                    let state', cmd = update ~socket ~user msg !state in
-                    state := state';
-                    let%lwt () = cmd in
-                    Dream.log "  %s: %s\n" user.username msg_str;
-                    loop ()
-                  with Yojson.Json_error err ->
-                    Dream.log "  %s: ERROR %s\n" err msg_str;
-                    loop ())
-            in
+            Dream.log "New client: %s\n" user.username; *)
+    let user : Discord.user = { id = "foo"; username = "user"; avatar = "" } in
+    let rec loop () =
+      match%lwt Dream.receive socket with
+      | None -> Dream.close_websocket socket
+      | Some msg_str -> (
+          try
+            let json = Yojson.Safe.from_string msg_str in
+            let _user_id, msg = Client.receive_with_user_id_of_yojson json in
+            let state', cmd = update ~socket ~user msg !state in
+            state := state';
+            let%lwt () = cmd in
+            Dream.log "  %s: %s\n" user.username msg_str;
+            loop ()
+          with Yojson.Json_error err ->
+            Dream.log "  %s: ERROR %s\n" err msg_str;
             loop ())
+    in
+    loop ()
+    (* ) *)
   in
   Dream.router
     [

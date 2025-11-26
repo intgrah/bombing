@@ -29,7 +29,7 @@ and lobby_data = {
 and game_data = {
   pin : string;
   players : username_and_avatar list Player.store;
-  state : Game.proj_t;
+  state : Game.client_t;
 }
 
 and username_and_avatar = { username : string; avatar : string }

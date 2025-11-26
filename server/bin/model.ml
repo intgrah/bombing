@@ -20,7 +20,7 @@ and game =
           String.comparator_witness )
         Map.t;
       players : string list Player.store;
-      state : Game.t;
+      state : Game.server_t;
     }
 
 let init : t = Map.empty (module String)

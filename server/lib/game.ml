@@ -2,41 +2,45 @@ open Base
 open Types
 open Ppx_yojson_conv_lib.Yojson_conv
 
-type hand = Card.t list [@@deriving show, yojson]
+module Perspective = struct
+  (* South (self), East, North (teammate), West *)
+  type ('s, 'e, 'n, 'w) t = { s : 's; e : 'e; n : 'n; w : 'w }
+  [@@deriving show, yojson_of]
 
-type t =
+  let players (from : Player.t) : (Player.t, Player.t, Player.t, Player.t) t =
+    {
+      s = Fn.apply_n_times ~n:0 Player.next from;
+      e = Fn.apply_n_times ~n:1 Player.next from;
+      n = Fn.apply_n_times ~n:2 Player.next from;
+      w = Fn.apply_n_times ~n:3 Player.next from;
+    }
+
+  let map (f : 'a -> 'b) (x : ('a, 'a, 'a, 'a) t) : ('b, 'b, 'b, 'b) t =
+    { s = f x.s; e = f x.e; n = f x.n; w = f x.w }
+
+  let seq (f : ('sa -> 'sb, 'ea -> 'eb, 'na -> 'nb, 'wa -> 'wb) t)
+      (x : ('sa, 'ea, 'na, 'wa) t) : ('sb, 'eb, 'nb, 'wb) t =
+    { s = f.s x.s; e = f.e x.e; n = f.n x.n; w = f.w x.w }
+end
+
+type 'h t =
   | Playing of {
-      hands : hand Player.store;
+      hands : 'h;
       level : level;
       finished : finished;
       turn : Player.t;
       current : (Player.t * Score.t) option;
     }
   | Trading of {
-      hands : hand Player.store;
+      hands : 'h;
       level : level;
       position : Player.position Player.store;
       remaining : int Player.store;
     }
   | Winner of { team : Player.team; level : level }
 
-and proj_t =
-  | Playing of {
-      hands : proj_hand;
-      level : level;
-      finished : finished;
-      turn : Player.t;
-      current : (Player.t * Score.t) option;
-    }
-  | Trading of {
-      hands : proj_hand;
-      level : level;
-      position : Player.position Player.store;
-      remaining : int Player.store;
-    }
-  | Winner of { team : Player.team; level : level }
-
-and proj_hand = { s : hand; e : int; n : int; w : int }
+and server_t = Card.t list Player.store t
+and client_t = (Card.t list, int, int, int) Perspective.t t
 and level = { ac : Rank.t; bd : Rank.t; who : Player.team }
 
 and finished =
@@ -45,31 +49,17 @@ and finished =
   | Both_masters of Player.t * Player.t
 [@@deriving show, yojson_of]
 
-let project_hand (perspective : Player.t) (hands : hand Player.store) :
-    proj_hand =
-  {
-    s = Player.get perspective hands;
-    e = Player.get (Player.next perspective) hands |> List.length;
-    n = Player.get (Player.teammate perspective) hands |> List.length;
-    w =
-      Player.get (Fn.apply_n_times ~n:3 Player.next perspective) hands
-      |> List.length;
-  }
+let project_hand (view : Player.t) (hands : Card.t list Player.store) :
+    (Card.t list, int, int, int) Perspective.t =
+  Perspective.players view
+  |> Perspective.map (Fn.flip Player.get hands)
+  |> Perspective.seq
+       { s = Fn.id; e = List.length; n = List.length; w = List.length }
 
-let project (perspective : Player.t) : t -> proj_t = function
-  | Playing { hands; level; finished; turn; current } ->
-      Playing
-        {
-          hands = project_hand perspective hands;
-          level;
-          finished;
-          turn;
-          current;
-        }
-  | Trading { hands; level; position; remaining } ->
-      Trading
-        { hands = project_hand perspective hands; level; position; remaining }
-  | Winner { team; level } -> Winner { team; level }
+let project (view : Player.t) : server_t -> client_t = function
+  | Playing p -> Playing { p with hands = project_hand view p.hands }
+  | Trading t -> Trading { t with hands = project_hand view t.hands }
+  | Winner w -> Winner w
 
 let rank_of : level -> Rank.t = function
   | { ac = r; bd = _; who = AC } | { ac = _; bd = r; who = BD } -> r
@@ -82,15 +72,15 @@ type action =
 [@@deriving show, of_yojson]
 
 let deal_hands () : Card.t list Player.store =
-  Card.all @ Card.all
-  |> List.map ~f:(fun c -> (Random.bits (), c))
-  |> List.sort ~compare:(Comparable.lift Int.compare ~f:fst)
-  |> List.map ~f:snd |> List.chunks_of ~length:27
-  |> function
-  | [ ha; hb; hc; hd ] -> Player.Store (ha, hb, hc, hd)
-  | _ -> failwith "Should have 108 cards"
+  let deck =
+    Card.all @ Card.all
+    |> List.map ~f:(fun c -> (Random.bits (), c))
+    |> List.sort ~compare:(Comparable.lift Int.compare ~f:fst)
+    |> List.map ~f:snd |> List.sub ~len:27
+  in
+  { a = deck ~pos:0; b = deck ~pos:27; c = deck ~pos:54; d = deck ~pos:81 }
 
-let new_game () : t =
+let new_game () : server_t =
   Playing
     {
       hands = deal_hands ();
@@ -100,10 +90,10 @@ let new_game () : t =
       current = None;
     }
 
-let transition (state : t) (player : Player.t) (msg : action) :
-    (t * _ list, _) Result.t =
+let transition (state : server_t) (player : Player.t) (msg : action) :
+    (server_t * _ list, _) Result.t =
   let open Result.Let_syntax in
-  let rec ( --- ) (xs : Card.t list) =
+  let rec multiset_subtract (xs : Card.t list) =
     let rec sub y = function
       | [] -> Error `Not_enough_cards
       | h :: hs when Card.equal h y -> Ok hs
@@ -111,7 +101,7 @@ let transition (state : t) (player : Player.t) (msg : action) :
     in
     function
     | [] -> Ok xs
-    | y :: ys -> sub y xs |> Result.bind ~f:(fun xs -> xs --- ys)
+    | y :: ys -> sub y xs |> Result.bind ~f:(Fn.flip multiset_subtract ys)
   in
 
   match (state, msg) with
@@ -145,7 +135,7 @@ let transition (state : t) (player : Player.t) (msg : action) :
         | Small_master -> Player.who_is Small_slave position
         | Small_slave -> Player.who_is Small_master position
       in
-      let%bind hand' = hand --- [ card ] in
+      let%bind hand' = multiset_subtract hand [ card ] in
       let hands' =
         hands |> Player.set player hand'
         |> Player.set receiver (card :: Player.get receiver hands)
@@ -153,7 +143,7 @@ let transition (state : t) (player : Player.t) (msg : action) :
       match
         Player.set player (Int.( - ) (Player.get player remaining) 1) remaining
       with
-      | Store (0, 0, 0, 0) ->
+      | { a = 0; b = 0; c = 0; d = 0 } ->
           Ok
             ( Playing
                 {
@@ -172,7 +162,7 @@ let transition (state : t) (player : Player.t) (msg : action) :
       Error `Not_your_turn
   | Playing { hands; level; finished; turn; current }, Pass ->
       let%bind leader, _ = Result.of_option current ~error:`Cannot_pass in
-      let rec next_state (turn : Player.t) : t =
+      let rec next_state (turn : Player.t) : server_t =
         let turn' = Player.next turn in
         match Player.(get turn' hands |> List.is_empty, equal turn' leader) with
         | true, true ->
@@ -203,7 +193,7 @@ let transition (state : t) (player : Player.t) (msg : action) :
             Error `Doesn't_beat
         | _ -> Ok ()
       in
-      let%bind hand' = Player.get player hands --- cards' in
+      let%bind hand' = multiset_subtract (Player.get player hands) cards' in
       let hands' = Player.set player hand' hands in
 
       let rec find_next (player : Player.t) : Player.t =

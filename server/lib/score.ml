@@ -63,13 +63,14 @@ let infer (level : Rank.t) (cards : Card.t list) : t list =
     | x0 :: x1 :: xs -> Rank.consec x1 x0 && pairwise (x1 :: xs)
   in
 
-  let max_seq (rs : Rank.t list) (f : Rank.t -> t list) : t list =
+  let max_seq (rs : Rank.t list) : Rank.t list =
     match List.rev rs with
-    | r0 :: rs when pairwise (r0 :: rs) -> f r0
-    | r0 :: r1 :: rs when pairwise ((r1 :: rs) @ [ r0 ]) -> f r1
+    | r0 :: rs when pairwise (r0 :: rs) -> [ r0 ]
+    | r0 :: r1 :: rs when pairwise ((r1 :: rs) @ [ r0 ]) -> [ r1 ]
     | _ -> []
   in
 
+  let open List.Monad_infix in
   match Collate.collate cards with
   | _ when true -> [ JokerBomb ]
   | [ J (Black, 2); J (Red, 2) ] -> [ JokerBomb ]
@@ -90,61 +91,61 @@ let infer (level : Rank.t) (cards : Card.t list) : t list =
   | [ R (r0, [ _ ]); R (r1, [ _; _; _ ]) ] -> [ TripleSingle (r1, R r0) ]
   | [ J (j0, 1); R (r1, [ _; _; _ ]) ] -> [ TripleSingle (r1, J j0) ]
   | [ R (r0, [ _; _; _ ]); R (r1, [ _; _; _ ]) ] ->
-      max_seq [ r0; r1 ] (fun r -> [ Plate r ])
+      max_seq [ r0; r1 ] >>= fun r -> [ Plate r ]
   | [
    R (r0, [ s0 ]); R (r1, [ s1 ]); R (r2, [ s2 ]); R (r3, [ s3 ]); R (r4, [ s4 ]);
-  ] ->
-      max_seq [ r0; r1; r2; r3; r4 ] (fun r ->
-          match List.all_equal ~equal:Suit.equal [ s0; s1; s2; s3; s4 ] with
-          | None -> [ Straight r ]
-          | Some s -> [ StraightFlush (r, s); Straight r ])
+  ] -> (
+      max_seq [ r0; r1; r2; r3; r4 ] >>= fun r ->
+      match List.all_equal ~equal:Suit.equal [ s0; s1; s2; s3; s4 ] with
+      | None -> [ Straight r ]
+      | Some s -> [ StraightFlush (r, s); Straight r ])
   | [ R (r0, [ _; _ ]); R (r1, [ _; _ ]); R (r2, [ _; _ ]) ] ->
-      max_seq [ r0; r1; r2 ] (fun r -> [ Tube r ])
+      max_seq [ r0; r1; r2 ] >>= fun r -> [ Tube r ]
   (* Diddy 2 *)
   | [ R (r0, [ _; _; _ ]); R (r1, [ _; _; _; _; _; _; _ ]) ] ->
-      max_seq [ r0; r1 ] (fun r -> [ Diddy2 (r, R r1, R r1) ])
+      max_seq [ r0; r1 ] >>= fun r -> [ Diddy2 (r, R r1, R r1) ]
   | [ R (r1, [ _; _; _; _; _ ]); R (r0, [ _; _; _; _; _ ]) ] ->
       let k0, k1 = wlog_gt r0 r1 in
-      max_seq [ r0; r1 ] (fun r -> [ Diddy2 (r, R k0, R k1) ])
+      max_seq [ r0; r1 ] >>= fun r -> [ Diddy2 (r, R k0, R k1) ]
   | [ R (r0, [ _; _; _ ]); R (r1, [ _; _; _ ]); R (k, [ _; _; _; _ ]) ] ->
-      max_seq [ r0; r1 ] (fun r -> [ Diddy2 (r, R k, R k) ])
+      max_seq [ r0; r1 ] >>= fun r -> [ Diddy2 (r, R k, R k) ]
   | [ J (k, 2); R (r0, [ _; _; _ ]); R (r1, [ _; _; _; _; _ ]) ] ->
-      max_seq [ r0; r1 ] (fun r -> [ Diddy2 (r, J k, R r1) ])
+      max_seq [ r0; r1 ] >>= fun r -> [ Diddy2 (r, J k, R r1) ]
   | [ R (k, [ _; _ ]); R (r0, [ _; _; _ ]); R (r1, [ _; _; _; _; _ ]) ] ->
       let k0, k1 = wlog_gt k r1 in
-      max_seq [ r0; r1 ] (fun r -> [ Diddy2 (r, R k0, R k1) ])
+      max_seq [ r0; r1 ] >>= fun r -> [ Diddy2 (r, R k0, R k1) ]
   | [ J (k1, 2); J (k0, 2); R (r0, [ _; _; _ ]); R (r1, [ _; _; _ ]) ] ->
-      max_seq [ r0; r1 ] (fun r -> [ Diddy2 (r, J k0, J k1) ])
+      max_seq [ r0; r1 ] >>= fun r -> [ Diddy2 (r, J k0, J k1) ]
   | [ R (k1, [ _; _ ]); J (k0, 2); R (r0, [ _; _; _ ]); R (r1, [ _; _; _ ]) ] ->
-      max_seq [ r0; r1 ] (fun r -> [ Diddy2 (r, J k0, R k1) ])
+      max_seq [ r0; r1 ] >>= fun r -> [ Diddy2 (r, J k0, R k1) ]
   | [
    R (k0, [ _; _ ]); R (k1, [ _; _ ]); R (r0, [ _; _; _ ]); R (r1, [ _; _; _ ]);
   ] ->
       let k0, k1 = wlog_gt k0 k1 in
-      max_seq [ r0; r1 ] (fun r -> [ Diddy2 (r, R k0, R k1) ])
+      max_seq [ r0; r1 ] >>= fun r -> [ Diddy2 (r, R k0, R k1) ]
   (* Diddy 1 *)
   | [ R (r0, [ _; _; _ ]); R (r1, [ _; _; _; _; _ ]) ] ->
-      max_seq [ r0; r1 ] (fun r -> [ Diddy1 (r, R r1, R r1) ])
+      max_seq [ r0; r1 ] >>= fun r -> [ Diddy1 (r, R r1, R r1) ]
   | [ R (r1, [ _; _; _; _ ]); R (r0, [ _; _; _; _ ]) ] ->
       let k0, k1 = wlog_gt r0 r1 in
-      max_seq [ r0; r1 ] (fun r -> [ Diddy1 (r, R k0, R k1) ])
+      max_seq [ r0; r1 ] >>= fun r -> [ Diddy1 (r, R k0, R k1) ]
   | [ J (k, 2); R (r0, [ _; _; _ ]); R (r1, [ _; _; _ ]) ] ->
-      max_seq [ r0; r1 ] (fun r -> [ Diddy1 (r, J k, J k) ])
+      max_seq [ r0; r1 ] >>= fun r -> [ Diddy1 (r, J k, J k) ]
   | [ R (k, [ _; _ ]); R (r0, [ _; _; _ ]); R (r1, [ _; _; _ ]) ] ->
-      max_seq [ r0; r1 ] (fun r -> [ Diddy1 (r, R k, R k) ])
+      max_seq [ r0; r1 ] >>= fun r -> [ Diddy1 (r, R k, R k) ]
   | [ J (k, 1); R (r0, [ _; _; _ ]); R (r1, [ _; _; _; _ ]) ] ->
-      max_seq [ r0; r1 ] (fun r -> [ Diddy1 (r, J k, R r1) ])
+      max_seq [ r0; r1 ] >>= fun r -> [ Diddy1 (r, J k, R r1) ]
   | [ R (k, [ _ ]); R (r0, [ _; _; _ ]); R (r1, [ _; _; _; _ ]) ] ->
       let k0, k1 = wlog_gt k r1 in
-      max_seq [ r0; r1 ] (fun r -> [ Diddy1 (r, R k0, R k1) ])
+      max_seq [ r0; r1 ] >>= fun r -> [ Diddy1 (r, R k0, R k1) ]
   | [ J (k1, 1); J (k0, 1); R (r0, [ _; _; _ ]); R (r1, [ _; _; _ ]) ] ->
-      max_seq [ r0; r1 ] (fun r -> [ Diddy1 (r, J k0, J k1) ])
+      max_seq [ r0; r1 ] >>= fun r -> [ Diddy1 (r, J k0, J k1) ]
   | [ R (k1, [ _ ]); J (k0, 1); R (r0, [ _; _; _ ]); R (r1, [ _; _; _ ]) ] ->
-      max_seq [ r0; r1 ] (fun r -> [ Diddy1 (r, J k0, R k1) ])
+      max_seq [ r0; r1 ] >>= fun r -> [ Diddy1 (r, J k0, R k1) ]
   | [ R (k0, [ _ ]); R (k1, [ _ ]); R (r0, [ _; _; _ ]); R (r1, [ _; _; _ ]) ]
     ->
       let k0, k1 = wlog_gt k0 k1 in
-      max_seq [ r0; r1 ] (fun r -> [ Diddy1 (r, R k0, R k1) ])
+      max_seq [ r0; r1 ] >>= fun r -> [ Diddy1 (r, R k0, R k1) ]
   | _ -> []
 
 let verify (level : Rank.t) (score : t) (cards : Card.t list) : bool =

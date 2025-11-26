@@ -45,20 +45,20 @@ type user = {
   id : string;
   username : string;
   avatar : string;
-  discriminator : string;
-  public_flags : int;
-  flags : int;
-  banner : string;
-  accent_color : string option;
-  global_name : string option;
-  avatar_decoration_data : string option;
-  collectibles : string option;
-  banner_color : string option;
-  clan : string option;
-  primary_guild : string option;
-  mfa_enabled : bool;
-  locale : string;
-  premium_type : int;
+  (* discriminator : string; *)
+  (* public_flags : int; *)
+  (* flags : int; *)
+  (* banner : string; *)
+  (* accent_color : string option; *)
+  (* global_name : string option; *)
+  (* avatar_decoration_data : string option; *)
+  (* collectibles : string option; *)
+  (* banner_color : string option; *)
+  (* clan : string option; *)
+  (* primary_guild : string option; *)
+  (* mfa_enabled : bool; *)
+  (* locale : string; *)
+  (* premium_type : int; *)
 }
 [@@deriving of_yojson]
 
